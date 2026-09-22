@@ -1,0 +1,12 @@
+# These are the legacy local Python/OpenCV pipeline (server.py, tune.py,
+# calibrate.py) -- not used by index.html, which runs entirely client-side.
+# Excluded from deployment so Vercel doesn't try to build them as Python
+# serverless functions.
+server.py
+tune.py
+calibrate.py
+pyproject.toml
+uv.lock
+calibration.png
+__pycache__/
+.venv/
