@@ -241,12 +241,24 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
 <script>
+// ── Device detection ───────────────────────────────────────────────────────
+// Real "is this a phone/tablet" check -- not just window shape. A laptop
+// browser window that happens to be taller than wide should NOT switch to
+// phone layout; only an actual touchscreen mobile device should.
+function detectIsMobile() {
+  const uaMobile = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent);
+  const hasTouch = (navigator.maxTouchPoints || 0) > 1 || 'ontouchstart' in window;
+  return uaMobile && hasTouch;
+}
+const IS_MOBILE = detectIsMobile();
+
 // ── Canvas / screen size ───────────────────────────────────────────────────
-// A phone in portrait gets a portrait-shaped canvas so the game actually
-// fills the screen; everything else (desktop, tablet, landscape) gets the
-// original 16:9 layout. fitCanvas() below CSS-scales whichever one is
-// active to fit the real viewport.
-const PORTRAIT = window.innerHeight > window.innerWidth;
+// A phone held in portrait gets a portrait-shaped canvas so the game
+// actually fills the screen; a laptop always gets the standard 16:9
+// layout regardless of how narrow the browser window is resized.
+// fitCanvas() below CSS-scales whichever one is active to fit the real
+// viewport.
+const PORTRAIT = IS_MOBILE && window.innerHeight > window.innerWidth;
 const W = PORTRAIT ? 720  : 1280;
 const H = PORTRAIT ? 1280 : 720;
 
@@ -586,8 +598,12 @@ video.setAttribute('playsinline', '');
 video.autoplay = true;
 
 let stream        = null;
-let currentFacing  = 'user';   // 'user' (front/selfie) or 'environment' (rear)
-let mirrored       = true;     // only mirror the front camera
+// Laptops have one front-facing webcam, so default to 'user'. Phones/tablets
+// default to the rear camera ('environment') -- the natural way to hold a
+// phone up at a note is pointing the back of it outward, not a selfie.
+// Either device can flip it with the camera button regardless of default.
+let currentFacing  = IS_MOBILE ? 'environment' : 'user';
+let mirrored       = currentFacing === 'user';  // only mirror the front camera
 let coverRect      = null;     // {sx,sy,sw,sh} crop of the video matching W:H
 let cameraReady    = false;
 let cameraError    = null;
