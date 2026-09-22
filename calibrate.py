@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
 """
+*** LEGACY / NOT USED IN SINGLE-LAPTOP MODE ***
+This tool is only for the original two-device setup: a projector displaying
+the game on a wall, and a *separate* camera watching that wall from a
+different position/angle (so camera-space and screen-space needed a
+homography to line up). If the game's camera and display are the same
+device (a laptop's/tablet's own webcam + its own screen), server.py and
+index.html handle that directly with no calibration step -- see README.md.
+This file (and its CANVAS_W/H, tuned for a 1920x1080 projector) is kept
+only for reference if you ever go back to that projector+camera setup.
+
 Calibration tool for Ball Falling Game.
 
 How it works:

@@ -1,93 +1,57 @@
 # StickyBounce
 
-A mixed reality wall game where digital balls fall from the top of a projected screen and bounce off **real sticky notes** you stick on the wall.
-
-A projector displays the game on the wall. A camera watches the wall. When you place a sticky note, the computer detects it and adds a physics collider — so the next ball that falls will bounce right off it.
+A mixed-reality game where digital balls fall down your screen and bounce off **real orange sticky notes** you hold up in front of your laptop/tablet's camera.
 
 Built as a fun activity for kids.
 
-
-https://github.com/user-attachments/assets/4deaa797-0e5c-4e14-b26e-3761d536cb90
+This fork runs in **single-device mode**: one laptop (or 2-in-1 like a Surface) is both the camera and the screen. No projector, no separate camera, no calibration step — you just watch the game on the laptop screen with your own live camera feed as the background.
 
 ---
 
 ## How it works
 
 ```
-Webcam (iPhone)
-     │
-
-Uploading stickyBounce-demo.mp4…
-
-
-     ▼
-Python + OpenCV  ──── detects yellow sticky notes (position + angle)
-     │
-     │  WebSocket (JSON)
-     ▼
-Browser + Matter.js  ──── physics simulation + rendering
+Laptop camera (front or rear)
      │
      ▼
-Projector  ──── displays the game on the wall
+Python + OpenCV  ──── detects orange sticky notes (position + angle)
+     │                also streams the live camera frame itself
+     │  WebSocket (JSON: notes + frame)
+     ▼
+Browser + Matter.js  ──── draws the camera frame as the background,
+                           runs physics sim, renders balls on top
+     │
+     ▼
+Laptop screen  ──── you watch the whole thing right there
 ```
 
-1. A Python script captures the webcam feed and detects yellow sticky notes using color detection (HSV thresholding)
-2. Detected note positions and angles are sent to the browser over a local WebSocket
-3. The browser runs a physics simulation (Matter.js) — each sticky note becomes a static rigid body
-4. Colorful balls spawn from the top and fall under gravity, deflecting off the notes
-5. The browser window is projected onto the wall fullscreen
+1. `server.py` captures the webcam feed, detects orange sticky notes with color detection (HSV thresholding), and streams both the note positions **and** the camera frame itself to the browser over a local WebSocket.
+2. `index.html` draws that camera frame as the canvas background, and Matter.js turns each detected note into a static rigid body.
+3. Colorful balls spawn from the top and fall under gravity, deflecting off wherever a note is.
+4. Because detection happens on the exact frame that gets displayed, note position and screen position always match — no homography/calibration needed.
 
 ---
 
 ## Hardware required
 
-- A computer (tested on macOS)
-- A projector pointed at a plain wall
-- A camera pointed at the wall (tested with iPhone via Continuity Camera)
-- **Yellow sticky notes** (other bright colors work too — see Tuning below)
+- A laptop or 2-in-1 (tested for Windows) with a webcam — front-facing, or rear-facing on something like a Surface
+- **Orange sticky notes**
 
 ---
 
 ## Setup
 
-**1. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) if you don't have it:**
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+**1. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) if you don't have it** (PowerShell):
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
 **2. Clone the repo and install dependencies:**
 ```bash
 git clone <repo-url>
-cd ball-falling
+cd "Sticky Bounce"
 uv sync
 ```
-
----
-
-## iPhone as webcam (macOS)
-
-1. On iPhone: **Settings → General → AirPlay & Handoff → Continuity Camera Webcam → ON**
-2. Connect iPhone via USB-C and tap **Trust** if prompted
-3. iPhone will appear as a camera (index `1`) on your Mac
-
----
-
-## Calibration (one time)
-
-Calibration maps the camera's view of the wall to the game's screen coordinates so detected notes land in the right place.
-
-**Step 1:** Open `index.html?calibrate=1` in your browser, fullscreen it on the projector display. Four numbered red dots will appear at the corners of the screen.
-
-**Step 2:** Run the calibration tool:
-```bash
-uv run calibrate.py
-```
-
-**Step 3:** In the camera window that opens, **left-click each red dot in order** (1 → 2 → 3 → 4) as you see them projected on the wall.
-
-![Calibration](calibration.png)
-
-Calibration is saved to `calibration.npz` and loaded automatically from then on.
 
 ---
 
@@ -98,9 +62,28 @@ Calibration is saved to `calibration.npz` and loaded automatically from then on.
 uv run server.py
 ```
 
-**Browser:** Open `index.html`, fullscreen it on the projector (**F** key or Cmd+Shift+F).
+**Browser:** open `index.html` (double-click it, or drag it into a browser tab). Press **F** to fullscreen.
 
-Balls will start falling from the top. Stick yellow post-its on the wall and watch them deflect!
+Balls will start falling. Hold an orange sticky note up in front of the camera and watch them bounce off it — you'll see yourself doing it live on screen, with the notes and balls drawn right on top of the video.
+
+---
+
+## Front camera vs. rear camera (e.g. Surface)
+
+By default `server.py` uses camera index `0` and **mirrors** the image, like a selfie cam — good for a laptop's built-in front camera where you're facing the screen and want left/right to match what you see in a mirror.
+
+If you'd rather hold the device up and point its **rear** camera at the notes (so you can watch the screen while the back of the laptop/tablet faces the notes/wall), turn mirroring off and pick the rear camera's index:
+
+```bash
+uv run server.py --camera 1 --no-mirror
+```
+
+Not sure which index is the rear camera? Preview each one first:
+```bash
+uv run tune.py --camera 0
+uv run tune.py --camera 1
+```
+Whichever shows the *outward-facing* view is your rear camera — use that index with `--no-mirror` when you launch `server.py`. (Mirroring only affects how it looks/feels; it doesn't affect detection accuracy either way.)
 
 ---
 
@@ -115,32 +98,41 @@ Balls will start falling from the top. Stick yellow post-its on the wall and wat
 
 ## Tuning & troubleshooting
 
-### Notes not being detected?
+### Notes not being detected, or your hand/face is being detected as a "note"?
 
-Run the tuning tool to check detection live:
+Orange sits close to skin tone in hue, so this is the main thing to tune. Run the tuning tool to check detection live:
 ```bash
 uv run tune.py
 ```
-Hold a sticky note in front of the camera — it should turn **cyan**. If it doesn't, your notes are a different shade. Open `server.py` and `tune.py` and adjust these values at the top:
+Hold an orange sticky note in front of the camera — it should turn **cyan** and get a green box. If it doesn't, or if skin/background is getting picked up instead, open `server.py` and `tune.py` and adjust these values at the top (keep them identical in both files):
 
 ```python
-PINK_LOWER_1 = np.array([18,  80,  80])   # H_min, S_min, V_min
-PINK_UPPER_1 = np.array([35, 255, 255])   # H_max, S_max, V_max
+ORANGE_LOWER = np.array([5,  130, 120])   # H_min, S_min, V_min
+ORANGE_UPPER = np.array([22, 255, 255])   # H_max, S_max, V_max
 ```
+
+- **Skin getting detected?** Raise `S_min` and/or `V_min` (2nd/3rd numbers) — skin is usually less saturated/bright than sticky-note paper under normal indoor light.
+- **Real notes not detected?** Lower `S_min`/`V_min`, or widen the hue range a little (e.g. `4` to `25`).
+- There's also an aspect-ratio filter (`MIN_ASPECT_RATIO` / `MAX_ASPECT_RATIO`, default `0.4`–`2.5`) that rejects long skinny blobs like an arm or sleeve, since a sticky note is roughly square.
 
 HSV hue reference (OpenCV uses 0–180):
 
 | Color  | H range |
 |--------|---------|
+| Orange | 4–20    |
 | Yellow | 18–35   |
-| Orange | 8–18    |
 | Pink   | 145–180 + 0–10 |
 | Green  | 35–85   |
 
-### Wrong camera?
+### Wrong camera, or want the rear camera?
 ```bash
-uv run server.py --camera 1   # or 0, 2, etc.
+uv run server.py --camera 1            # try a different index
+uv run server.py --camera 1 --no-mirror  # rear camera, unmirrored
 ```
+
+### Laptop feels slow / choppy video
+
+The camera frame is streamed to the browser as JPEG over the WebSocket. If it's laggy, lower `JPEG_QUALITY` or `CAPTURE_WIDTH`/`CAPTURE_HEIGHT` at the top of `server.py` (and update the matching `W`/`H` at the top of `index.html`'s script — they must stay equal for notes to line up with the video).
 
 ---
 
@@ -156,11 +148,35 @@ All tweaks are in `index.html`:
 | Bigger balls | `BALL_RADIUS` | `18` | `28` |
 | More balls max | `MAX_BALLS` | `40` | `80` |
 | Spawn position | `const x = W / 2` | center | `W * 0.3` |
+| Hoop gap width | `RIM_GAP` | `110` | `90` (harder) / `140` (easier) |
+| Baskets needed to finish a round | `RACE_TARGET` | `5` | `10` for a longer race |
+| Hoop vertical range | `HOOP_Y_MIN` / `HOOP_Y_MAX` | `0.38`–`0.58` of screen height | raise/lower to taste |
+
+---
+
+## Competition mode
+
+The game is now a timed race, not just an endless ball-drop:
+
+1. **Start screen** — press **Start**, with an optional **2 Player Mode** checkbox.
+2. **Countdown** — 3, 2, 1, GO!, then balls start falling and the clock starts.
+3. **Race to `RACE_TARGET` baskets** (5 by default) — the hoop relocates after every basket, so each one has to be aimed for fresh. The HUD at the top shows your running time and basket count.
+4. **Finish** — the clock stops the instant the last basket goes in.
+   - Single-player: shows your time and a **Retry** button (back to the start screen).
+   - 2-player mode: Player 1's finish screen shows **Onto Player 2 →**; after Player 2 finishes, it shows both times, declares the winner (lower time wins), and offers **Retry** to restart the whole match.
+
+---
+
+## Legacy: projector + separate camera mode
+
+The original version of this project targeted a different physical setup: a projector displaying the game on a wall, and a *separate* camera (e.g. an iPhone via Continuity Camera) watching that wall from a different angle. That needed a one-time calibration step (`calibrate.py`) to map camera-space to screen-space via homography.
+
+That mode isn't wired up in this fork (`server.py`/`index.html` now assume the camera and the display are the same device, so no homography is computed). `calibrate.py` is kept in the repo for reference only — see the note at the top of that file if you ever want to revive that setup.
 
 ---
 
 ## Tech stack
 
-- **Python** — OpenCV (color detection), websockets
-- **JavaScript** — Matter.js (physics), Canvas (rendering)
+- **Python** — OpenCV (color detection + JPEG frame streaming), websockets
+- **JavaScript** — Matter.js (physics), Canvas (rendering + video compositing)
 - **uv** — Python package manager
