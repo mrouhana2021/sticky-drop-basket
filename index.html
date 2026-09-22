@@ -71,14 +71,15 @@
     .panel h1 {
       font-family: var(--font-display);
       font-weight: 800;
-      font-size: 23px;
-      letter-spacing: 0.03em;
+      font-size: clamp(17px, 5.2vw, 23px);
+      line-height: 1.4;
+      letter-spacing: 0.02em;
       margin-bottom: 10px;
       background: linear-gradient(90deg, #ffffff, var(--accent-2));
       -webkit-background-clip: text; background-clip: text; color: transparent;
     }
     .panel h1.winner-title {
-      font-size: 26px;
+      font-size: clamp(19px, 6vw, 26px);
       background: linear-gradient(90deg, var(--win-gold), var(--accent-2));
       -webkit-background-clip: text; background-clip: text; color: transparent;
     }
@@ -192,8 +193,8 @@
       color: var(--text-dim); letter-spacing: 0.05em; white-space: nowrap;
     }
     .duel-turn-label {
-      font-family: var(--font-display); font-weight: 700; font-size: 18px;
-      letter-spacing: 0.05em; margin: 8px 0 4px; color: #fff;
+      font-family: var(--font-display); font-weight: 700; font-size: clamp(14px, 4.5vw, 18px);
+      line-height: 1.4; letter-spacing: 0.04em; margin: 8px 0 4px; color: #fff;
       text-shadow: 0 0 20px rgba(255,90,30,0.6);
     }
     .panel h1.p1-color, .panel h1.p2-color {
@@ -603,7 +604,17 @@ let stream        = null;
 // phone up at a note is pointing the back of it outward, not a selfie.
 // Either device can flip it with the camera button regardless of default.
 let currentFacing  = IS_MOBILE ? 'environment' : 'user';
-let mirrored       = currentFacing === 'user';  // only mirror the front camera
+
+// On a phone, only the front camera should mirror -- the rear camera truly
+// points away from you, so it should show what's really there. On a
+// laptop, you're always sitting facing the screen no matter which webcam
+// is selected (a second/external cam picked via the flip button isn't
+// pointing away from you the way a phone's rear camera does), so keep
+// mirroring on regardless of which camera is active.
+function mirrorForFacing(facing) {
+  return IS_MOBILE ? facing === 'user' : true;
+}
+let mirrored = mirrorForFacing(currentFacing);
 let coverRect      = null;     // {sx,sy,sw,sh} crop of the video matching W:H
 let cameraReady    = false;
 let cameraError    = null;
@@ -665,7 +676,7 @@ async function startCamera(facing) {
   if (!stream) throw lastErr || new Error('getUserMedia failed');
 
   currentFacing = facing;
-  mirrored = facing === 'user';
+  mirrored = mirrorForFacing(facing);
 
   video.srcObject = stream;
   await video.play();
