@@ -675,8 +675,23 @@ async function startCamera(facing) {
   }
   if (!stream) throw lastErr || new Error('getUserMedia failed');
 
-  currentFacing = facing;
-  mirrored = mirrorForFacing(facing);
+  // Trust the camera's own reported facing mode when the browser provides
+  // one (track.getSettings().facingMode) -- that's what actually opened,
+  // which can differ from what we asked for (especially on the plain
+  // {video:true} fallback above, which doesn't request a facing mode at
+  // all). Most laptop webcams don't report a facingMode, so fall back to
+  // the device-type heuristic in that case.
+  const track        = stream.getVideoTracks()[0];
+  const settings      = track && track.getSettings ? track.getSettings() : {};
+  const actualFacing  = settings.facingMode;
+
+  if (actualFacing === 'user' || actualFacing === 'environment') {
+    currentFacing = actualFacing;
+    mirrored      = actualFacing === 'user';
+  } else {
+    currentFacing = facing;
+    mirrored      = mirrorForFacing(facing);
+  }
 
   video.srcObject = stream;
   await video.play();
